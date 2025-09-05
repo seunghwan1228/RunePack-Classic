@@ -44,13 +44,30 @@ local runeTextures = {
 }
 
 
+-- Debug function to log position information
+local function LogPosition(tag)
+    if not RuneFrameC then return end
+    local x, y = RuneFrameC:GetCenter()
+    if x and y then
+        local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
+        local offsetX, offsetY = x - (screenWidth/2), y - (screenHeight/2)
+        DEFAULT_CHAT_FRAME:AddMessage(string.format(
+            "%s - Current position: %.1f, %.1f (screen center offset: %.1f, %.1f)", 
+            tag, x, y, offsetX, offsetY
+        ))
+        if RunePack_Saved and RunePack_Saved.x and RunePack_Saved.y then
+            DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                "%s - Saved position: %.1f, %.1f",
+                tag, RunePack_Saved.x, RunePack_Saved.y
+            ))
+        end
+    end
+end
+
 -- Default settings
 local defaultSettings = {
-    x           = 0,
-    y           = 316,
-    anchor      = "CENTER",
-    parent      = "UIParent",
-    rel         = "CENTER",  -- Using CENTER for consistency
+    x           = 0,    -- X offset from screen center
+    y           = 50,   -- Y offset from screen center (reduced to be more visible)
     scale       = 4.1,
     Locked      = true,
     HideRp      = false,
@@ -61,23 +78,75 @@ local defaultSettings = {
 -- Function to apply position to frame from saved settings
 function RunePack_SetPosition()
     -- Safety check
-    if not RuneFrameC then return end
+    if not RuneFrameC then 
+        DEFAULT_CHAT_FRAME:AddMessage("RunePack_SetPosition: Error - RuneFrameC not available");
+        return 
+    end
+    
+    if not RunePack_Saved then 
+        DEFAULT_CHAT_FRAME:AddMessage("RunePack_SetPosition: Error - RunePack_Saved not available");
+        return 
+    end
     
     -- Clear all anchor points first
     RuneFrameC:ClearAllPoints();
     
-    -- Use absolute positioning relative to UIParent for maximum reliability
-    RuneFrameC:SetPoint(
-        "CENTER",         -- We always anchor from center point
-        UIParent,        -- Always relative to screen
-        "CENTER",        -- Always relative to center of screen
-        RunePack_Saved.x, -- X offset from center
-        RunePack_Saved.y  -- Y offset from center
-    );
-    
-    -- For debugging
-    DEFAULT_CHAT_FRAME:AddMessage(string.format("RunePack: Position applied - CENTER, UIParent, CENTER, %.1f, %.1f", 
-        RunePack_Saved.x, RunePack_Saved.y));
+    -- Check for the new positioning format first
+    if RunePack_Saved.point and RunePack_Saved.xOfs and RunePack_Saved.yOfs then
+        -- Use the absolute positioning that was saved from dragging
+        RuneFrameC:SetPoint(
+            RunePack_Saved.point,
+            UIParent, -- Always relative to UIParent for consistency
+            RunePack_Saved.relativePoint or "BOTTOMLEFT",
+            RunePack_Saved.xOfs,
+            RunePack_Saved.yOfs
+        );
+        
+        DEFAULT_CHAT_FRAME:AddMessage(string.format(
+            "RunePack: Position applied - %s to %s of UIParent (%.1f, %.1f)", 
+            RunePack_Saved.point, RunePack_Saved.relativePoint or "BOTTOMLEFT", 
+            RunePack_Saved.xOfs, RunePack_Saved.yOfs
+        ));
+    elseif RunePack_Saved.x ~= nil and RunePack_Saved.y ~= nil then
+        -- Backward compatibility with old format (center offset)
+        RuneFrameC:SetPoint(
+            "CENTER",
+            UIParent,
+            "CENTER",
+            RunePack_Saved.x,
+            RunePack_Saved.y
+        );
+        
+        DEFAULT_CHAT_FRAME:AddMessage(string.format(
+            "RunePack: Position applied using legacy format - CENTER relative to screen center, offset: %.1f, %.1f", 
+            RunePack_Saved.x, RunePack_Saved.y
+        ));
+        
+        -- Convert to new format on next save
+        RunePack_Saved.point = "CENTER";
+        RunePack_Saved.relativeTo = "UIParent";
+        RunePack_Saved.relativePoint = "CENTER";
+        RunePack_Saved.xOfs = RunePack_Saved.x;
+        RunePack_Saved.yOfs = RunePack_Saved.y;
+    else
+        -- Use defaults if nothing else is available
+        RuneFrameC:SetPoint(
+            "CENTER",
+            UIParent,
+            "CENTER",
+            defaultSettings.x,
+            defaultSettings.y
+        );
+        
+        DEFAULT_CHAT_FRAME:AddMessage("RunePack: Position applied using default values");
+        
+        -- Set the new format values
+        RunePack_Saved.point = "CENTER";
+        RunePack_Saved.relativeTo = "UIParent";
+        RunePack_Saved.relativePoint = "CENTER";
+        RunePack_Saved.xOfs = defaultSettings.x;
+        RunePack_Saved.yOfs = defaultSettings.y;
+    end
 end
 
 -- Initialize saved variables with defaults if needed
@@ -96,7 +165,8 @@ end
 
 -- Function to ensure settings are saved and provide feedback
 -- silent parameter will suppress feedback messages
-function RunePack_SaveSettings(silent)
+-- forcePosition parameter will re-save position data even when silent
+function RunePack_SaveSettings(silent, forcePosition)
     -- Ensure RunePack_Saved exists
     if not RunePack_Saved then 
         RunePack_Saved = {};
@@ -110,6 +180,28 @@ function RunePack_SaveSettings(silent)
     
     -- Add a timestamp to track when settings were last saved
     RunePack_Saved.lastSaved = date("%Y-%m-%d %H:%M:%S");
+    
+    -- Position handling - only if frame exists and we either want position updates or aren't in silent mode
+    if RuneFrameC and (forcePosition or not silent) then
+        -- GetPoint returns the anchor information we need
+        local point, relativeTo, relativePoint, xOfs, yOfs = RuneFrameC:GetPoint();
+        
+        if point then
+            -- Store these absolute positioning values - this is what WoW itself uses for frames
+            RunePack_Saved.point = point;
+            RunePack_Saved.relativeTo = relativeTo and relativeTo:GetName() or "UIParent";
+            RunePack_Saved.relativePoint = relativePoint;
+            RunePack_Saved.xOfs = xOfs;
+            RunePack_Saved.yOfs = yOfs;
+            
+            if not silent then
+                DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                    "RunePack: Saving absolute position: %s to %s of %s (%.1f, %.1f)", 
+                    point, relativePoint, RunePack_Saved.relativeTo, xOfs, yOfs
+                ));
+            end
+        end
+    end
     
     -- Force save with FlushSavedVariables if available (newer WoW API)
     if FlushSavedVariables then
@@ -373,9 +465,7 @@ function RuneFrameC_OnEvent (self, event, ...)
             end
             
                 -- Apply position using our dedicated positioning function
-            if RunePack_Saved.x ~= nil and RunePack_Saved.y ~= nil then
-                RunePack_SetPosition();
-            end
+            RunePack_SetPosition();
             
             -- Apply transparency settings
             if RuneFrameBack and RunePack_Saved.BgOpacity then
@@ -397,18 +487,13 @@ function RuneFrameC_AddRune (runeFrameC, rune)
 end
 
 
+-- This function is now handled directly in the XML
 function RuneFrameC_OnDragStart()
     RuneFrameC:StartMoving();
 end
 
-
-function RuneFrameC_OnDragStop()
-    RunePack_Saved.anchor = "CENTER";
-    RunePack_Saved.parent = "UIParent";
-    RunePack_Saved.rel = "BOTTOMLEFT";
-    RunePack_Saved.x,RunePack_Saved.y = RuneFrameC:GetCenter();
-    RuneFrameC:StopMovingOrSizing();
-end
+-- Note: RuneFrameC_OnDragStop is now handled directly in the XML
+-- to ensure consistent positioning calculations
 
 --
 -- GUI Functions
@@ -458,8 +543,7 @@ function RunePackOptionsPanel_CancelOrLoad()
     RunePackOptions_AlphaOoc:SetValue(RunePack_Saved.OocOpacity);
 
     --Addon Frames
-    RuneFrameC:ClearAllPoints();
-    RuneFrameC:SetPoint(RunePack_Saved.anchor, RunePack_Saved.parent, RunePack_Saved.rel, RunePack_Saved.x, RunePack_Saved.y);
+    RunePack_SetPosition(); -- Use our consistent positioning function
     RuneFrameC:SetScale(RunePack_Saved.scale / 5);
     RuneFrameC_Locked_OnClick(RunePack_Saved.Locked);
     RuneFrameC_HideRp_OnClick(RunePack_Saved.HideRp);

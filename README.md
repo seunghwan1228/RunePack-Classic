@@ -1,2 +1,0 @@
-# RunePack-Classic
-RunePack Classic

@@ -73,23 +73,23 @@
         if not RunePack_Saved.Locked then
           self:StopMovingOrSizing();
           
-          -- Get center coordinates directly, most reliable way
-          local x, y = self:GetCenter();
+          -- Get absolute point values for precise positioning
+          local point, relativeTo, relativePoint, xOfs, yOfs = self:GetPoint();
           
-          -- Convert to offsets from screen center for consistency
-          local screenWidth = GetScreenWidth();
-          local screenHeight = GetScreenHeight();
+          -- Save these exact values (this is what WoW itself uses)
+          RunePack_Saved.point = point;
+          RunePack_Saved.relativeTo = "UIParent";
+          RunePack_Saved.relativePoint = relativePoint;
+          RunePack_Saved.xOfs = xOfs;
+          RunePack_Saved.yOfs = yOfs;
           
-          -- Store offsets from center of screen
-          RunePack_Saved.x = x - (screenWidth/2);
-          RunePack_Saved.y = y - (screenHeight/2);
-          
-          -- Save settings immediately
-          RunePack_SaveSettings();
+          -- Force save settings immediately
+          RunePack_SaveSettings(false, true); -- Not silent, force position
           
           -- Let user know position was saved
-          DEFAULT_CHAT_FRAME:AddMessage(string.format("RunePack: Position saved (%.1f, %.1f from screen center)", 
-            RunePack_Saved.x, RunePack_Saved.y));
+          DEFAULT_CHAT_FRAME:AddMessage(string.format(
+            "RunePack: Position saved - %s to %s of %s (%.1f, %.1f)", 
+            point, relativePoint, "UIParent", xOfs, yOfs));
         end
       </OnDragStop>
     </Scripts>
