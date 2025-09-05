@@ -1,0 +1,20 @@
+tag v3.0.0
+[Updated for WoW 10.2.0]
+2025-09-05 21:41:00 +0900
+
+Updated RunePack for modern World of Warcraft (Dragonflight 10.2.0)
+
+
+--------------------
+
+Major changes:
+- Updated Interface version to 100200 (Dragonflight 10.2.0)
+- Fixed deprecated API functions:
+  - Replaced getglobal() with _G[] references
+  - Updated CreateFrame calls with proper templates
+  - Updated UnitPower to properly use Enum.PowerType.RunicPower
+- Updated rune detection logic to work with modern Death Knight rune system
+- Updated event handling for current WoW API
+- Fixed 6th rune button name for consistency
+- Updated Interface Options handling to use modern Settings API
+- Updated XML schema reference

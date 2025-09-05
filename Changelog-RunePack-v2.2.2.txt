@@ -1,0 +1,13 @@
+tag v2.2.2
+6a76b2ed5ceea9ad555ec83f761d83e683273758
+magus424 <magus@the-magi.us>
+2016-07-22 23:49:07 -0700
+
+Fixed author name
+
+
+--------------------
+
+magus424:
+	- Removed unused death rune texture
+	- initial commit; version 2.2, wow patch 7.0
